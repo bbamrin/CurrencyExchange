@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">CurrencyV1</string>
+    <string-array name="currencies">
+        <item>USD</item>
+        <item>EUR</item>
+        <item>RUB</item>
+    </string-array>
+    <string name="exchange_rate_info">rate</string>
+    <string name="button_refresh">refresh rate</string>
+    <string name="nav_text">to</string>
+</resources>
