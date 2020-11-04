@@ -1,29 +1,17 @@
 package com.example.currencyv1.ui.main
 
-import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModelProvider
 import android.os.Bundle
-import android.util.Log
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Button
 import android.widget.Toast
-import androidx.activity.viewModels
-import androidx.annotation.RestrictTo
 import androidx.core.widget.doOnTextChanged
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModelProvider
 import com.example.currencyv1.R
-import com.example.currencyv1.api.BaseCurrency
 import com.example.currencyv1.databinding.MainFragmentBinding
-import com.example.currencyv1.model.Currency
-import com.example.currencyv1.model.CurrencyRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
-import kotlin.random.Random
 
 class MainFragment : Fragment() {
 
@@ -36,8 +24,6 @@ class MainFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var viewModel: MainViewModel
-    private lateinit var repository: CurrencyRepository
-    private lateinit var button: Button;
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
                               savedInstanceState: Bundle?): View {
@@ -63,11 +49,11 @@ class MainFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel.resultRate.observe(this, {
-            binding.exchangeRate.text = String.format("%.1f", it)
+            binding.exchangeRate.text = getString(R.string.rate_value, it.toString())
         })
 
         viewModel.resultValue.observe(this, {
-            binding.resultCurrencyValue.text = String.format("%.1f", it)
+            binding.resultCurrencyValue.text = it.toString()
         })
 
         viewModel.isLoaded.observe(this, {
@@ -78,21 +64,20 @@ class MainFragment : Fragment() {
             binding.reloadTime.text = it
         })
 
+        viewModel.isErrorOcurred.observe(this, {
+            if (it)
+                Toast.makeText(context, viewModel.errorMessage.value, Toast.LENGTH_LONG).show()
+        })
 
         binding.reloadRate.setOnClickListener(object : View.OnClickListener {
             override fun onClick(v: View?) {
-                Log.e("e", "e")
                 viewModel.onRateRefreshRequested()
             }
         })
 
         binding.baseCurrencyValue.doOnTextChanged { text, _, _, _ ->
-            if (viewModel.isErrorOcurred.value == true) {
-                Toast.makeText(context, viewModel.errorMessage.value, Toast.LENGTH_LONG).show()
-
-            }
             text?.let {
-                viewModel.onBaseCurrencyValueChanged(if (it.isNotEmpty()) text.toString() else "0")
+                viewModel.onBaseCurrencyValueChanged(if (it.isNotEmpty()) text.toString() else "")
             }
         }
 
@@ -105,9 +90,6 @@ class MainFragment : Fragment() {
                 id: Long
             ) {
                 parent?.let {
-                    if (viewModel.isErrorOcurred.value == true) {
-                        Log.e("test", it.getItemAtPosition(position).toString())
-                    }
                     viewModel.onResultCurrencyChanged(it.getItemAtPosition(position).toString())
                 }
             }
@@ -131,9 +113,6 @@ class MainFragment : Fragment() {
                 id: Long
             ) {
                 parent?.let {
-                    if (viewModel.isErrorOcurred.value == true) {
-                        Log.e("test", it.getItemAtPosition(position).toString())
-                    }
                     viewModel.onBaseCurrencyChanged(it.getItemAtPosition(position).toString())
                 }
             }
@@ -147,6 +126,7 @@ class MainFragment : Fragment() {
                 id: Long
             ) {}
         }
+        viewModel.initialRefreshRate()
     }
 
     override fun onDestroyView() {

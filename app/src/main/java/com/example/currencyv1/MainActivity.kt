@@ -1,13 +1,10 @@
 package com.example.currencyv1
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import com.example.currencyv1.model.CurrencyRepository
+import androidx.appcompat.app.AppCompatActivity
 import com.example.currencyv1.ui.main.MainFragment
 
 class MainActivity : AppCompatActivity() {
-
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -17,6 +14,5 @@ class MainActivity : AppCompatActivity() {
                     .replace(R.id.container, MainFragment.newInstance())
                     .commitNow()
         }
-
     }
 }

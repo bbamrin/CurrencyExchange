@@ -1,32 +1,25 @@
 package com.example.currencyv1.ui.main
 
-import android.util.Log
-import androidx.core.content.contentValuesOf
 import androidx.lifecycle.*
-import com.example.currencyv1.api.BaseCurrency
-import com.example.currencyv1.model.Currencies
+import com.example.currencyv1.model.*
 import com.example.currencyv1.model.Currency
-import com.example.currencyv1.model.CurrencyRepository
-import com.example.currencyv1.model.Status
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.*
+import kotlin.math.round
 
 class MainViewModel : ViewModel() {
 
     private var refreshJob: Job? = null
     private var convertJob: Job? = null
+    private var initialRefreshJob: Job? = null
 
     private val _baseValue: MutableLiveData<Double> = MutableLiveData()
-    val baseValue: LiveData<Double> = _baseValue
 
     private val _baseCurrency: MutableLiveData<Currencies> = MutableLiveData()
-    val  baseCurrency: LiveData<Currencies> = _baseCurrency
 
     private val _resultCurrency: MutableLiveData<Currencies> = MutableLiveData()
-    val resultCurrency: LiveData<Currencies> = _resultCurrency
 
     private val _isLoaded: MutableLiveData<Boolean> = MutableLiveData(true)
     val isLoaded: LiveData<Boolean> = _isLoaded
@@ -35,20 +28,19 @@ class MainViewModel : ViewModel() {
     val loadedDate: LiveData<String> = _loadedDate
 
     private val _currency: MediatorLiveData<Currency> = MediatorLiveData()
-    val currency: LiveData<Currency> = _currency
 
     private val _isErrorOcurred : MutableLiveData<Boolean> = MutableLiveData(false)
     val isErrorOcurred : LiveData<Boolean> = _isErrorOcurred
 
-    private val _errorMessage : MutableLiveData<String> = MutableLiveData()
+    private val _errorMessage : MutableLiveData<String> = MutableLiveData(ResponseHandler.UNDEFINED_RATE_ERROR)
     val errorMessage : LiveData<String> = _errorMessage
 
     val resultValue: LiveData<Double> = Transformations.switchMap(_currency) {
-        MutableLiveData(it.resultValue)
+        MutableLiveData(roundDouble(it.resultValue))
     }
 
     val resultRate: LiveData<Double> = Transformations.switchMap(_currency) {
-        MutableLiveData(it.baseRate)
+        MutableLiveData(roundDouble(it.baseRate))
     }
 
     init {
@@ -66,7 +58,10 @@ class MainViewModel : ViewModel() {
     }
 
     fun onBaseCurrencyValueChanged(value: String) {
-        _baseValue.value = value.toDouble()
+        if (value.isNotEmpty())
+            _baseValue.value = value.toDouble()
+        else
+            _baseValue.value = 0.0
     }
 
     fun onResultCurrencyChanged (value: String) {
@@ -77,7 +72,7 @@ class MainViewModel : ViewModel() {
         _baseCurrency.value = Currencies.valueOf(value)
     }
 
-    fun convertBaseCurrency() {
+    private fun convertBaseCurrency() {
         if (_isErrorOcurred.value != true) {
             cancelJob(convertJob)
             convertJob = viewModelScope.launch {
@@ -88,11 +83,9 @@ class MainViewModel : ViewModel() {
                             _baseValue.value
                     )
                     if (res.status == Status.ERROR) {
-                        _isErrorOcurred.value = true
-                        _errorMessage.value = res.message
+                        handleError(res)
                     }
                     else {
-                        _isErrorOcurred.value = false
                         _currency.value = res.data
                     }
                 }
@@ -100,29 +93,61 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun refreshRate() {
+    private fun refreshRate() {
         cancelJob(refreshJob)
         refreshJob = viewModelScope.launch {
             _isLoaded.value = false
             val res = CurrencyRepository.refreshRate()
             if (res.status == Status.ERROR) {
-                _isErrorOcurred.value = true
-                _errorMessage.value = res.message
+                handleError(res)
             }
             else {
-                _isErrorOcurred.value = false
-                _currency.value = res.data
                 convertBaseCurrency()
-                val formatter = SimpleDateFormat("dd/M/yyyy hh:mm:ss")
-                _loadedDate.value = formatter.format(Calendar.getInstance().time)
-                _isLoaded.value = true
+                _currency.value = res.data
+                _loadedDate.value = getCurrentDate()
             }
+            _isLoaded.value = true
         }
     }
 
     fun onRateRefreshRequested() {
         refreshRate()
     }
+
+    fun initialRefreshRate() {
+        cancelJob(initialRefreshJob)
+        initialRefreshJob = viewModelScope.launch {
+            _isLoaded.value = false
+            val res = CurrencyRepository.initialRefreshRate()
+            if (res.status == Status.ERROR) {
+                handleError(res)
+            }
+            else {
+                _isErrorOcurred.value = false
+                convertBaseCurrency()
+                _currency.value = res.data
+                _loadedDate.value = getCurrentDate()
+            }
+            _isLoaded.value = true
+        }
+    }
+
+    private fun getCurrentDate(): String {
+        val formatter = SimpleDateFormat("dd/M/yyyy hh:mm:ss")
+        return formatter.format(Calendar.getInstance().time)
+    }
+
+    private fun handleError(error: Resource<Any>) {
+        _errorMessage.value = error.message
+        toggleError()
+    }
+
+    private fun toggleError() {
+        _isErrorOcurred.value = true
+        _isErrorOcurred.value = false
+    }
+
+    private fun roundDouble(x: Double) = round(x * 100) / 100
 
     private fun cancelJob (job: Job?) {
         job?.let {it.cancel()}
